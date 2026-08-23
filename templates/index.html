@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>VoxChat — Chat, Voz e Vídeo</title>
+<link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+
+<!-- TELA DE ENTRADA -->
+<div id="login-screen" class="screen">
+  <div class="login-card">
+    <h1>🎙️ VoxChat</h1>
+    <p class="subtitle">Chat de texto, voz, vídeo e compartilhamento de tela em tempo real</p>
+    <input id="name-input" type="text" placeholder="Seu nome" maxlength="32" autocomplete="off">
+    <input id="room-input" type="text" placeholder="Nome da sala (ex: geral)" maxlength="32" autocomplete="off" value="geral">
+    <button id="join-btn">Entrar na sala</button>
+    <p class="hint">Permita o acesso ao microfone/câmera quando solicitado.</p>
+  </div>
+</div>
+
+<!-- APP PRINCIPAL -->
+<div id="app-screen" class="screen hidden">
+  <div class="app-layout">
+
+    <!-- SIDEBAR -->
+    <aside class="sidebar">
+      <div class="room-header">
+        <span id="room-name-label">#geral</span>
+      </div>
+      <div class="members-section">
+        <h3>Conectados — <span id="member-count">0</span></h3>
+        <ul id="member-list"></ul>
+      </div>
+      <div class="controls">
+        <button id="mic-btn" class="ctrl-btn active" title="Microfone">🎤</button>
+        <button id="cam-btn" class="ctrl-btn" title="Câmera">📷</button>
+        <button id="screen-btn" class="ctrl-btn" title="Compartilhar tela">🖥️</button>
+        <button id="leave-btn" class="ctrl-btn danger" title="Sair">📞</button>
+      </div>
+    </aside>
+
+    <!-- MAIN -->
+    <main class="main-area">
+      <div class="video-grid" id="video-grid"></div>
+
+      <div class="chat-panel">
+        <div class="chat-messages" id="chat-messages"></div>
+        <form id="chat-form" autocomplete="off">
+          <input id="chat-input" type="text" placeholder="Enviar mensagem..." maxlength="1000">
+          <button type="submit">Enviar</button>
+        </form>
+      </div>
+    </main>
+
+  </div>
+</div>
+
+<script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
+<script src="{{ url_for('static', filename='app.js') }}"></script>
+</body>
+</html>
