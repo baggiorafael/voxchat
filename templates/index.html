@@ -14,7 +14,8 @@
     <h1>🎙️ VoxChat</h1>
     <p class="subtitle">Chat de texto, voz, vídeo e compartilhamento de tela em tempo real</p>
     <input id="name-input" type="text" placeholder="Seu nome" maxlength="32" autocomplete="off">
-    <input id="room-input" type="text" placeholder="Nome da sala (ex: geral)" maxlength="32" autocomplete="off" value="geral">
+    <p class="field-label">Servidor</p>
+    <div id="server-picker" class="server-picker"></div>
     <input id="password-input" type="password" placeholder="Senha da sala" maxlength="64" autocomplete="off" inputmode="numeric">
     <p id="login-error" class="login-error hidden"></p>
     <button id="join-btn">Entrar na sala</button>
@@ -25,6 +26,9 @@
 <!-- APP PRINCIPAL -->
 <div id="app-screen" class="screen hidden">
   <div class="app-layout">
+
+    <!-- BARRA DE SERVIDORES -->
+    <nav id="server-rail" class="server-rail"></nav>
 
     <!-- SIDEBAR -->
     <aside class="sidebar">

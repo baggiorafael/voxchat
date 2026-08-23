@@ -7,7 +7,8 @@
   const loginScreen = document.getElementById("login-screen");
   const appScreen = document.getElementById("app-screen");
   const nameInput = document.getElementById("name-input");
-  const roomInput = document.getElementById("room-input");
+  const serverPicker = document.getElementById("server-picker");
+  const serverRail = document.getElementById("server-rail");
   const passwordInput = document.getElementById("password-input");
   const loginError = document.getElementById("login-error");
   const joinBtn = document.getElementById("join-btn");
@@ -25,11 +26,23 @@
   const soundboardPanel = document.getElementById("soundboard-panel");
   const leaveBtn = document.getElementById("leave-btn");
 
+  const SERVERS = [
+    { id: "geral", name: "Geral" },
+    { id: "resenhas", name: "RESENHAS" },
+    { id: "vava", name: "VAVA" },
+  ];
+
+  function serverInitials(name) {
+    return name.trim().slice(0, 2).toUpperCase();
+  }
+
   let socket = null;
   let localStream = null;
   let screenStream = null;
   let myName = "";
   let myRoom = "";
+  let myPassword = "";
+  let selectedServer = SERVERS[0].id;
   let mySid = null;
   let micOn = true;
   let camOn = false;
@@ -207,6 +220,56 @@
     soundboardPanel.classList.toggle("hidden");
   });
 
+  function buildServerPicker() {
+    serverPicker.innerHTML = "";
+    SERVERS.forEach((server) => {
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "server-option" + (server.id === selectedServer ? " selected" : "");
+      btn.innerHTML = `<span class="server-dot">${serverInitials(server.name)}</span><span>${escapeHtml(server.name)}</span>`;
+      btn.addEventListener("click", () => {
+        selectedServer = server.id;
+        [...serverPicker.children].forEach((el) => el.classList.remove("selected"));
+        btn.classList.add("selected");
+      });
+      serverPicker.appendChild(btn);
+    });
+  }
+  buildServerPicker();
+
+  function buildServerRail() {
+    serverRail.innerHTML = "";
+    SERVERS.forEach((server) => {
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "server-icon" + (server.id === myRoom ? " active" : "");
+      btn.title = server.name;
+      btn.textContent = serverInitials(server.name);
+      btn.addEventListener("click", () => switchServer(server.id));
+      serverRail.appendChild(btn);
+    });
+  }
+
+  function switchServer(newRoom) {
+    if (!socket || newRoom === myRoom) return;
+
+    socket.emit("leave-room", { room: myRoom });
+
+    Object.keys(peers).forEach(closePeer);
+    videoGrid.innerHTML = "";
+    chatMessages.innerHTML = "";
+    memberList.innerHTML = "";
+    memberCount.textContent = "0";
+    Object.keys(remoteStatus).forEach((k) => delete remoteStatus[k]);
+    Object.keys(remoteNames).forEach((k) => delete remoteNames[k]);
+
+    myRoom = newRoom;
+
+    const attempt = () => socket.emit("join-room", { name: myName, room: myRoom, password: myPassword });
+    if (socket.connected) attempt();
+    else socket.once("connect", attempt);
+  }
+
   async function ensureLocalStream() {
     if (localStream) return localStream;
 
@@ -214,8 +277,14 @@
     // para que a track de vídeo já exista na conexão WebRTC desde o início.
     // Ligar a câmera depois é só reativar essa track — sem isso, o outro lado
     // nunca recebe o vídeo porque a conexão não é renegociada automaticamente.
+    const audioConstraints = {
+      echoCancellation: true,
+      noiseSuppression: true,
+      autoGainControl: true,
+    };
+
     try {
-      localStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: true });
+      localStream = await navigator.mediaDevices.getUserMedia({ audio: audioConstraints, video: true });
       localStream.getVideoTracks().forEach((t) => (t.enabled = false));
       return localStream;
     } catch (err) {
@@ -224,7 +293,7 @@
     }
 
     try {
-      localStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+      localStream = await navigator.mediaDevices.getUserMedia({ audio: audioConstraints, video: false });
     } catch (err) {
       console.warn("Sem acesso a microfone, entrando somente com chat de texto.", err);
       localStream = null;
@@ -390,8 +459,10 @@
 
       loginScreen.classList.add("hidden");
       appScreen.classList.remove("hidden");
-      roomNameLabel.textContent = "# " + myRoom;
+      const server = SERVERS.find((s) => s.id === myRoom);
+      roomNameLabel.textContent = "# " + (server ? server.name : myRoom);
       joinBtn.disabled = false;
+      buildServerRail();
 
       upsertVideoTile(mySid, localStream, myName, true);
       for (const u of users) {
@@ -444,21 +515,21 @@
 
   function joinRoom() {
     myName = nameInput.value.trim() || "Anônimo";
-    myRoom = roomInput.value.trim() || "geral";
-    const password = passwordInput.value;
+    myRoom = selectedServer;
+    myPassword = passwordInput.value;
 
     loginError.classList.add("hidden");
     joinBtn.disabled = true;
 
     initSocket();
 
-    const attempt = () => socket.emit("join-room", { name: myName, room: myRoom, password });
+    const attempt = () => socket.emit("join-room", { name: myName, room: myRoom, password: myPassword });
     if (socket.connected) attempt();
     else socket.once("connect", attempt);
   }
 
   joinBtn.addEventListener("click", joinRoom);
-  [nameInput, roomInput, passwordInput].forEach((el) =>
+  [nameInput, passwordInput].forEach((el) =>
     el.addEventListener("keydown", (e) => {
       if (e.key === "Enter") joinRoom();
     })

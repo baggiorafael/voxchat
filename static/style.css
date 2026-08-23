@@ -79,8 +79,81 @@ html, body {
   margin: -4px 0 8px;
 }
 
+.field-label {
+  text-align: left;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+  color: var(--text-muted);
+  margin: 4px 0 6px;
+}
+
+.server-picker {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.server-picker button {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 4px;
+  border: 2px solid transparent;
+  border-radius: 10px;
+  background: var(--bg-darkest);
+  color: var(--text-muted);
+  cursor: pointer;
+  font-size: 11px;
+}
+.server-picker button .server-dot {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: var(--bg-light);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: 13px;
+  color: var(--text);
+}
+.server-picker button.selected {
+  border-color: var(--accent);
+  color: var(--text);
+}
+.server-picker button.selected .server-dot { background: var(--accent); }
+
 /* ---- APP LAYOUT ---- */
 .app-layout { display: flex; height: 100vh; }
+
+.server-rail {
+  width: 72px;
+  flex-shrink: 0;
+  background: var(--bg-darkest);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 0;
+}
+
+.server-icon {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  border: none;
+  background: var(--bg-light);
+  color: var(--text);
+  font-weight: 700;
+  font-size: 14px;
+  cursor: pointer;
+  transition: border-radius 0.15s, background 0.15s;
+}
+.server-icon:hover { background: var(--accent); border-radius: 16px; }
+.server-icon.active { background: var(--accent); border-radius: 16px; }
 
 .sidebar {
   width: 260px;
@@ -297,6 +370,15 @@ html, body {
 
 @media (max-width: 700px) {
   .app-layout { flex-direction: column; }
+
+  .server-rail {
+    width: 100%;
+    flex-direction: row;
+    padding: 8px 12px;
+    overflow-x: auto;
+    justify-content: flex-start;
+  }
+  .server-icon { width: 40px; height: 40px; flex-shrink: 0; font-size: 12px; }
 
   .sidebar { width: 100%; flex-shrink: 0; }
 
