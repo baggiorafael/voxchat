@@ -7,6 +7,8 @@ app = Flask(__name__)
 app.config['SECRET_KEY'] = 'dev-secret-change-me'
 socketio = SocketIO(app, cors_allowed_origins="*", async_mode="threading")
 
+ROOM_PASSWORD = os.environ.get("ROOM_PASSWORD", "123456789")
+
 # room_id -> { sid: {"name": str, "muted": bool, "camera_off": bool} }
 rooms = {}
 
@@ -45,6 +47,11 @@ def on_disconnect():
 
 @socketio.on("join-room")
 def on_join_room(data):
+    password = data.get("password") or ""
+    if password != ROOM_PASSWORD:
+        emit("join-error", {"message": "Senha incorreta."})
+        return
+
     room_id = data.get("room", "geral").strip() or "geral"
     name = (data.get("name") or "Anônimo").strip()[:32]
     sid = request.sid
