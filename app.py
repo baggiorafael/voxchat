@@ -113,6 +113,15 @@ def on_chat_message(data):
     )
 
 
+@socketio.on("play-sound")
+def on_play_sound(data):
+    room_id = data.get("room")
+    sound = data.get("sound")
+    if not room_id or not sound:
+        return
+    emit("play-sound", {"sound": sound}, room=room_id, include_self=False)
+
+
 @socketio.on("update-status")
 def on_update_status(data):
     room_id = data.get("room")

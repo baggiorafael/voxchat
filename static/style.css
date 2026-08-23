@@ -136,7 +136,37 @@ html, body {
   gap: 8px;
   padding: 12px;
   background: var(--bg-darkest);
+  position: relative;
 }
+
+.soundboard-panel {
+  position: absolute;
+  bottom: calc(100% + 8px);
+  left: 12px;
+  right: 12px;
+  background: var(--bg-dark);
+  border: 1px solid var(--bg-light);
+  border-radius: 8px;
+  padding: 10px;
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 8px;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.5);
+  z-index: 30;
+}
+
+.soundboard-panel button {
+  padding: 10px 6px;
+  border: none;
+  border-radius: 6px;
+  background: var(--bg-light);
+  color: var(--text);
+  font-size: 12px;
+  cursor: pointer;
+  text-align: center;
+}
+.soundboard-panel button:hover { background: var(--accent); }
+.soundboard-panel button:active { transform: scale(0.96); }
 
 .ctrl-btn {
   flex: 1;

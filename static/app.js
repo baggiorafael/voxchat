@@ -21,6 +21,8 @@
   const micBtn = document.getElementById("mic-btn");
   const camBtn = document.getElementById("cam-btn");
   const screenBtn = document.getElementById("screen-btn");
+  const soundsBtn = document.getElementById("sounds-btn");
+  const soundboardPanel = document.getElementById("soundboard-panel");
   const leaveBtn = document.getElementById("leave-btn");
 
   let socket = null;
@@ -59,6 +61,151 @@
     '<rect x="2" y="6" width="14" height="12" rx="2" fill="currentColor"/>' +
     '<path d="M16 10.5 21.4 7a1 1 0 0 1 1.6.8v8.4a1 1 0 0 1-1.6.8L16 13.5v-3Z" fill="currentColor"/>' +
     "</svg>";
+
+  // ---- Soundboard: sons de meme gerados na hora via Web Audio API. Tocam só
+  // no alto-falante local de cada um (não entram no áudio da chamada em si),
+  // sincronizados entre a sala via um evento simples pelo socket.
+
+  let audioCtx = null;
+  function getAudioCtx() {
+    if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    if (audioCtx.state === "suspended") audioCtx.resume();
+    return audioCtx;
+  }
+
+  function tone(ctx, { freq, start, dur, type = "sine", gain = 0.25, endFreq, ramp = "exponential" }) {
+    const osc = ctx.createOscillator();
+    const g = ctx.createGain();
+    osc.type = type;
+    osc.frequency.setValueAtTime(freq, start);
+    if (endFreq) {
+      if (ramp === "linear") osc.frequency.linearRampToValueAtTime(endFreq, start + dur);
+      else osc.frequency.exponentialRampToValueAtTime(Math.max(endFreq, 1), start + dur);
+    }
+    g.gain.setValueAtTime(gain, start);
+    g.gain.exponentialRampToValueAtTime(0.001, start + dur);
+    osc.connect(g).connect(ctx.destination);
+    osc.start(start);
+    osc.stop(start + dur + 0.02);
+  }
+
+  function noiseBurst(ctx, { start, dur, gain = 0.25, filterFreq = 2000 }) {
+    const bufferSize = Math.ceil(ctx.sampleRate * dur);
+    const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
+    const data = buffer.getChannelData(0);
+    for (let i = 0; i < bufferSize; i++) data[i] = Math.random() * 2 - 1;
+
+    const src = ctx.createBufferSource();
+    src.buffer = buffer;
+    const filter = ctx.createBiquadFilter();
+    filter.type = "bandpass";
+    filter.frequency.value = filterFreq;
+    const g = ctx.createGain();
+    g.gain.setValueAtTime(gain, start);
+    g.gain.exponentialRampToValueAtTime(0.001, start + dur);
+
+    src.connect(filter).connect(g).connect(ctx.destination);
+    src.start(start);
+    src.stop(start + dur + 0.02);
+  }
+
+  const SOUNDS = {
+    airhorn: {
+      label: "📯 Buzina",
+      play() {
+        const ctx = getAudioCtx();
+        const now = ctx.currentTime;
+        for (let i = 0; i < 3; i++) {
+          tone(ctx, { freq: 320, start: now + i * 0.32, dur: 0.3, type: "sawtooth", gain: 0.28 });
+        }
+      },
+    },
+    applause: {
+      label: "👏 Aplausos",
+      play() {
+        const ctx = getAudioCtx();
+        const now = ctx.currentTime;
+        for (let i = 0; i < 18; i++) {
+          noiseBurst(ctx, {
+            start: now + i * 0.07 + Math.random() * 0.02,
+            dur: 0.1,
+            gain: 0.15,
+            filterFreq: 2500 + Math.random() * 2000,
+          });
+        }
+      },
+    },
+    buzzer: {
+      label: "❌ Errou",
+      play() {
+        const ctx = getAudioCtx();
+        const now = ctx.currentTime;
+        tone(ctx, { freq: 180, endFreq: 60, start: now, dur: 0.55, type: "sawtooth", gain: 0.3, ramp: "linear" });
+      },
+    },
+    tada: {
+      label: "🎉 Vitória",
+      play() {
+        const ctx = getAudioCtx();
+        const now = ctx.currentTime;
+        [523.25, 659.25, 783.99, 1046.5].forEach((freq, i) => {
+          tone(ctx, { freq, start: now + i * 0.11, dur: 0.35, type: "triangle", gain: 0.22 });
+        });
+      },
+    },
+    rimshot: {
+      label: "🥁 Rufar",
+      play() {
+        const ctx = getAudioCtx();
+        const now = ctx.currentTime;
+        [0, 0.18, 0.36].forEach((t, i) => {
+          tone(ctx, { freq: 200, start: now + t, dur: 0.08, type: "triangle", gain: 0.25 });
+          noiseBurst(ctx, { start: now + t, dur: 0.06, gain: 0.2, filterFreq: 4000 });
+        });
+        noiseBurst(ctx, { start: now + 0.55, dur: 0.4, gain: 0.28, filterFreq: 5000 });
+      },
+    },
+    trombone: {
+      label: "😂 Womp Womp",
+      play() {
+        const ctx = getAudioCtx();
+        const now = ctx.currentTime;
+        [0, 0.45, 0.9].forEach((t, i) => {
+          tone(ctx, {
+            freq: 300 - i * 20,
+            endFreq: 180 - i * 20,
+            start: now + t,
+            dur: 0.4,
+            type: "sawtooth",
+            gain: 0.22,
+            ramp: "linear",
+          });
+        });
+      },
+    },
+  };
+
+  function playSound(key) {
+    if (SOUNDS[key]) SOUNDS[key].play();
+  }
+
+  function buildSoundboard() {
+    soundboardPanel.innerHTML = "";
+    Object.entries(SOUNDS).forEach(([key, { label }]) => {
+      const btn = document.createElement("button");
+      btn.textContent = label;
+      btn.addEventListener("click", () => {
+        playSound(key);
+        if (socket) socket.emit("play-sound", { room: myRoom, sound: key });
+      });
+      soundboardPanel.appendChild(btn);
+    });
+  }
+  buildSoundboard();
+
+  soundsBtn.addEventListener("click", () => {
+    soundboardPanel.classList.toggle("hidden");
+  });
 
   async function ensureLocalStream() {
     if (localStream) return localStream;
@@ -265,6 +412,8 @@
     socket.on("room-users", (users) => renderMemberList(users));
 
     socket.on("chat-message", (msg) => addChatMessage(msg));
+
+    socket.on("play-sound", ({ sound }) => playSound(sound));
 
     socket.on("webrtc-offer", async ({ sdp, from }) => {
       const pc = createPeerConnection(from);
