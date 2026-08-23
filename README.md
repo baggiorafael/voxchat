@@ -21,7 +21,7 @@ um usuário.
 3. No painel do Render: **New > Web Service**, conecte o repositório.
 4. Configure:
    - **Build Command:** `pip install -r requirements.txt`
-   - **Start Command:** `gunicorn --worker-class eventlet -w 1 app:app`
+   - **Start Command:** `python app.py`
 5. Clique em **Create Web Service**. Em alguns minutos o Render te dá uma URL
    pública tipo `https://voxchat.onrender.com` — é isso que você compartilha.
 
