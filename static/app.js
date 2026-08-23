@@ -33,6 +33,7 @@
 
   const peers = {}; // sid -> RTCPeerConnection
   const remoteNames = {}; // sid -> name
+  const remoteStatus = {}; // sid -> { muted, camera_off }
 
   function escapeHtml(str) {
     const div = document.createElement("div");
@@ -46,14 +47,26 @@
 
   async function ensureLocalStream() {
     if (localStream) return localStream;
+
+    // Pedimos áudio + vídeo já na entrada (mesmo que a câmera comece desligada)
+    // para que a track de vídeo já exista na conexão WebRTC desde o início.
+    // Ligar a câmera depois é só reativar essa track — sem isso, o outro lado
+    // nunca recebe o vídeo porque a conexão não é renegociada automaticamente.
+    try {
+      localStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: true });
+      localStream.getVideoTracks().forEach((t) => (t.enabled = false));
+      return localStream;
+    } catch (err) {
+      console.warn("Sem câmera, tentando entrar só com áudio.", err);
+      camBtn.disabled = true;
+    }
+
     try {
       localStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
-      localStream.getVideoTracks().forEach((t) => (t.enabled = false));
     } catch (err) {
       console.warn("Sem acesso a microfone, entrando somente com chat de texto.", err);
       localStream = null;
       micBtn.disabled = true;
-      camBtn.disabled = true;
       micBtn.classList.remove("active");
       micBtn.classList.add("off");
     }
@@ -74,16 +87,25 @@
       videoGrid.appendChild(tile);
     }
     const video = tile.querySelector("video");
-    const placeholder = tile.querySelector(".placeholder-avatar");
-    if (stream && stream.getVideoTracks().some((t) => t.enabled)) {
-      video.srcObject = stream;
-      video.style.display = "block";
-      placeholder.style.display = "none";
-    } else {
-      video.style.display = "none";
-      placeholder.style.display = "flex";
-    }
+    if (stream) video.srcObject = stream;
+    updateTileVisibility(sid, isLocal);
     return tile;
+  }
+
+  // Track recebida via WebRTC não reflete se o outro lado desligou a câmera
+  // (o "enabled" do MediaStreamTrack remoto é local e sempre fica true), então
+  // usamos o status que o servidor propaga (evento room-users) como fonte da
+  // verdade para decidir se mostramos o vídeo ou o avatar de espaço reservado.
+  function updateTileVisibility(sid, isLocal = sid === mySid) {
+    const tile = document.getElementById("tile-" + sid);
+    if (!tile) return;
+    const video = tile.querySelector("video");
+    const placeholder = tile.querySelector(".placeholder-avatar");
+    const cameraOff = isLocal ? (sharingScreen ? false : !camOn) : (remoteStatus[sid]?.camera_off ?? true);
+    const hasVideo = video.srcObject && video.srcObject.getVideoTracks().length > 0;
+    const showVideo = hasVideo && !cameraOff;
+    video.style.display = showVideo ? "block" : "none";
+    placeholder.style.display = showVideo ? "none" : "flex";
   }
 
   function removeVideoTile(sid) {
@@ -111,6 +133,9 @@
     memberCount.textContent = users.length;
     memberList.innerHTML = "";
     users.forEach((u) => {
+      if (u.sid !== mySid) {
+        remoteStatus[u.sid] = { muted: u.muted, camera_off: u.camera_off };
+      }
       const li = document.createElement("li");
       const isMe = u.sid === mySid;
       li.innerHTML = `
@@ -119,6 +144,7 @@
         <span class="member-status">${u.muted ? "🔇" : ""}${!u.camera_off ? "📹" : ""}</span>
       `;
       memberList.appendChild(li);
+      updateTileVisibility(u.sid, isMe);
     });
   }
 
@@ -272,29 +298,41 @@
 
   camBtn.addEventListener("click", async () => {
     if (!localStream) return;
-    camOn = !camOn;
 
-    if (camOn) {
+    let videoTrack = localStream.getVideoTracks()[0];
+
+    // Câmera não foi concedida na entrada (usuário negou ou não tinha):
+    // pede agora e, como a conexão já está de pé, precisa renegociar com
+    // cada peer manualmente pra eles passarem a receber essa track nova.
+    if (!videoTrack) {
       try {
         const camStream = await navigator.mediaDevices.getUserMedia({ video: true });
-        const camTrack = camStream.getVideoTracks()[0];
-        const oldTrack = localStream.getVideoTracks()[0];
-        if (oldTrack) {
-          localStream.removeTrack(oldTrack);
-          oldTrack.stop();
+        videoTrack = camStream.getVideoTracks()[0];
+        localStream.addTrack(videoTrack);
+
+        for (const [sid, pc] of Object.entries(peers)) {
+          pc.addTrack(videoTrack, localStream);
+          const offer = await pc.createOffer();
+          await pc.setLocalDescription(offer);
+          socket.emit("webrtc-offer", { to: sid, sdp: pc.localDescription });
         }
-        localStream.addTrack(camTrack);
       } catch (err) {
         alert("Não foi possível acessar a câmera: " + err.message);
-        camOn = false;
         return;
       }
-    } else {
-      localStream.getVideoTracks().forEach((t) => (t.enabled = false));
     }
 
-    if (!sharingScreen) replaceOutgoingTracks(localStream);
-    upsertVideoTile(mySid, localStream, myName, true);
+    camOn = !camOn;
+    videoTrack.enabled = camOn;
+
+    if (sharingScreen) {
+      // enquanto compartilha tela, a câmera fica só "reservada" (não é o que
+      // é enviado); replaceOutgoingTracks vai recolocá-la quando parar.
+    } else {
+      replaceOutgoingTracks(localStream);
+    }
+
+    updateTileVisibility(mySid, true);
     camBtn.classList.toggle("active", camOn);
     camBtn.classList.toggle("off", !camOn);
     socket.emit("update-status", { room: myRoom, camera_off: !camOn });
