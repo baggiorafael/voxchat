@@ -203,6 +203,48 @@
         new Audio(this.src).play().catch((e) => console.warn("Não deu pra tocar o áudio", e));
       },
     },
+    custom2: {
+      label: "🔥 Zoeira 2",
+      src: "/static/sounds/custom2.mp3",
+      play() {
+        new Audio(this.src).play().catch((e) => console.warn("Não deu pra tocar o áudio", e));
+      },
+    },
+    custom3: {
+      label: "🔥 Zoeira 3",
+      src: "/static/sounds/custom3.mp3",
+      play() {
+        new Audio(this.src).play().catch((e) => console.warn("Não deu pra tocar o áudio", e));
+      },
+    },
+    custom4: {
+      label: "🔥 Zoeira 4",
+      src: "/static/sounds/custom4.mp3",
+      play() {
+        new Audio(this.src).play().catch((e) => console.warn("Não deu pra tocar o áudio", e));
+      },
+    },
+    custom5: {
+      label: "🔥 Zoeira 5",
+      src: "/static/sounds/custom5.m4a",
+      play() {
+        new Audio(this.src).play().catch((e) => console.warn("Não deu pra tocar o áudio", e));
+      },
+    },
+    custom6: {
+      label: "🔥 Zoeira 6",
+      src: "/static/sounds/custom6.ogg",
+      play() {
+        new Audio(this.src).play().catch((e) => console.warn("Não deu pra tocar o áudio", e));
+      },
+    },
+    custom7: {
+      label: "🔥 Zoeira 7",
+      src: "/static/sounds/custom7.mp3",
+      play() {
+        new Audio(this.src).play().catch((e) => console.warn("Não deu pra tocar o áudio", e));
+      },
+    },
   };
 
   function playSound(key) {
