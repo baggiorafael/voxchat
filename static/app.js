@@ -1,7 +1,16 @@
 (() => {
+  // STUN só ajuda dois peers a se encontrarem quando pelo menos um dos dois
+  // tem NAT "aberto". Com 3+ pessoas em rede móvel/corporativa é comum um
+  // par específico nunca fechar conexão direta mesmo enquanto ambos
+  // conseguem falar com um terceiro — por isso também precisa de um
+  // servidor TURN (retransmite o áudio/vídeo quando a rota direta falha).
   const ICE_SERVERS = [
     { urls: "stun:stun.l.google.com:19302" },
     { urls: "stun:stun1.l.google.com:19302" },
+    { urls: "stun:openrelay.metered.ca:80" },
+    { urls: "turn:openrelay.metered.ca:80", username: "openrelayproject", credential: "openrelayproject" },
+    { urls: "turn:openrelay.metered.ca:443", username: "openrelayproject", credential: "openrelayproject" },
+    { urls: "turn:openrelay.metered.ca:443?transport=tcp", username: "openrelayproject", credential: "openrelayproject" },
   ];
 
   const loginScreen = document.getElementById("login-screen");
