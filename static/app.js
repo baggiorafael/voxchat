@@ -196,6 +196,13 @@
         });
       },
     },
+    custom1: {
+      label: "🔥 Zoeira",
+      src: "/static/sounds/custom1.m4a",
+      play() {
+        new Audio(this.src).play().catch((e) => console.warn("Não deu pra tocar o áudio", e));
+      },
+    },
   };
 
   function playSound(key) {
