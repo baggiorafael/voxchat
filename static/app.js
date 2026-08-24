@@ -24,6 +24,12 @@
   const screenBtn = document.getElementById("screen-btn");
   const soundsBtn = document.getElementById("sounds-btn");
   const soundboardPanel = document.getElementById("soundboard-panel");
+  const volumeBtn = document.getElementById("volume-btn");
+  const volumePanel = document.getElementById("volume-panel");
+  const callVolumeSlider = document.getElementById("call-volume-slider");
+  const callVolumeValue = document.getElementById("call-volume-value");
+  const soundsVolumeSlider = document.getElementById("sounds-volume-slider");
+  const soundsVolumeValue = document.getElementById("sounds-volume-value");
   const leaveBtn = document.getElementById("leave-btn");
 
   const SERVERS = [
@@ -47,6 +53,8 @@
   let micOn = true;
   let camOn = false;
   let sharingScreen = false;
+  let callVolume = Number(localStorage.getItem("voxchat-call-volume") ?? 1);
+  let soundsVolume = Number(localStorage.getItem("voxchat-sounds-volume") ?? 1);
 
   const peers = {}; // sid -> RTCPeerConnection
   const remoteNames = {}; // sid -> name
@@ -80,8 +88,14 @@
   // sincronizados entre a sala via um evento simples pelo socket.
 
   let audioCtx = null;
+  let soundsMasterGain = null;
   function getAudioCtx() {
-    if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    if (!audioCtx) {
+      audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      soundsMasterGain = audioCtx.createGain();
+      soundsMasterGain.gain.value = soundsVolume;
+      soundsMasterGain.connect(audioCtx.destination);
+    }
     if (audioCtx.state === "suspended") audioCtx.resume();
     return audioCtx;
   }
@@ -97,7 +111,7 @@
     }
     g.gain.setValueAtTime(gain, start);
     g.gain.exponentialRampToValueAtTime(0.001, start + dur);
-    osc.connect(g).connect(ctx.destination);
+    osc.connect(g).connect(soundsMasterGain);
     osc.start(start);
     osc.stop(start + dur + 0.02);
   }
@@ -117,9 +131,15 @@
     g.gain.setValueAtTime(gain, start);
     g.gain.exponentialRampToValueAtTime(0.001, start + dur);
 
-    src.connect(filter).connect(g).connect(ctx.destination);
+    src.connect(filter).connect(g).connect(soundsMasterGain);
     src.start(start);
     src.stop(start + dur + 0.02);
+  }
+
+  function playFileSound(src) {
+    const audio = new Audio(src);
+    audio.volume = soundsVolume;
+    audio.play().catch((e) => console.warn("Não deu pra tocar o áudio", e));
   }
 
   const SOUNDS = {
@@ -200,49 +220,49 @@
       label: "🔥 Zoeira",
       src: "/static/sounds/custom1.m4a",
       play() {
-        new Audio(this.src).play().catch((e) => console.warn("Não deu pra tocar o áudio", e));
+        playFileSound(this.src);
       },
     },
     custom2: {
       label: "🔥 Zoeira 2",
       src: "/static/sounds/custom2.mp3",
       play() {
-        new Audio(this.src).play().catch((e) => console.warn("Não deu pra tocar o áudio", e));
+        playFileSound(this.src);
       },
     },
     custom3: {
       label: "🔥 Zoeira 3",
       src: "/static/sounds/custom3.mp3",
       play() {
-        new Audio(this.src).play().catch((e) => console.warn("Não deu pra tocar o áudio", e));
+        playFileSound(this.src);
       },
     },
     custom4: {
       label: "🔥 Zoeira 4",
       src: "/static/sounds/custom4.mp3",
       play() {
-        new Audio(this.src).play().catch((e) => console.warn("Não deu pra tocar o áudio", e));
+        playFileSound(this.src);
       },
     },
     custom5: {
       label: "🔥 Zoeira 5",
       src: "/static/sounds/custom5.m4a",
       play() {
-        new Audio(this.src).play().catch((e) => console.warn("Não deu pra tocar o áudio", e));
+        playFileSound(this.src);
       },
     },
     custom6: {
       label: "🔥 Zoeira 6",
       src: "/static/sounds/custom6.ogg",
       play() {
-        new Audio(this.src).play().catch((e) => console.warn("Não deu pra tocar o áudio", e));
+        playFileSound(this.src);
       },
     },
     custom7: {
       label: "🔥 Zoeira 7",
       src: "/static/sounds/custom7.mp3",
       play() {
-        new Audio(this.src).play().catch((e) => console.warn("Não deu pra tocar o áudio", e));
+        playFileSound(this.src);
       },
     },
   };
@@ -267,6 +287,31 @@
 
   soundsBtn.addEventListener("click", () => {
     soundboardPanel.classList.toggle("hidden");
+    volumePanel.classList.add("hidden");
+  });
+
+  callVolumeSlider.value = Math.round(callVolume * 100);
+  callVolumeValue.textContent = callVolumeSlider.value + "%";
+  soundsVolumeSlider.value = Math.round(soundsVolume * 100);
+  soundsVolumeValue.textContent = soundsVolumeSlider.value + "%";
+
+  volumeBtn.addEventListener("click", () => {
+    volumePanel.classList.toggle("hidden");
+    soundboardPanel.classList.add("hidden");
+  });
+
+  callVolumeSlider.addEventListener("input", () => {
+    callVolume = Number(callVolumeSlider.value) / 100;
+    callVolumeValue.textContent = callVolumeSlider.value + "%";
+    localStorage.setItem("voxchat-call-volume", callVolume);
+    applyCallVolume();
+  });
+
+  soundsVolumeSlider.addEventListener("input", () => {
+    soundsVolume = Number(soundsVolumeSlider.value) / 100;
+    soundsVolumeValue.textContent = soundsVolumeSlider.value + "%";
+    localStorage.setItem("voxchat-sounds-volume", soundsVolume);
+    if (soundsMasterGain) soundsMasterGain.gain.value = soundsVolume;
   });
 
   function buildServerPicker() {
@@ -368,8 +413,15 @@
     }
     const video = tile.querySelector("video");
     if (stream) video.srcObject = stream;
+    if (!isLocal) video.volume = callVolume;
     updateTileVisibility(sid, isLocal);
     return tile;
+  }
+
+  function applyCallVolume() {
+    videoGrid.querySelectorAll("video:not([muted])").forEach((v) => {
+      v.volume = callVolume;
+    });
   }
 
   // Track recebida via WebRTC não reflete se o outro lado desligou a câmera
