@@ -5,6 +5,31 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>VoxChat — Chat, Voz e Vídeo</title>
 <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+<script>
+  // Reporta erros de JS pro servidor automaticamente, pra dar visibilidade
+  // de problemas em produção sem depender de alguém descrever o bug.
+  (function () {
+    function report(payload) {
+      try {
+        navigator.sendBeacon("/api/report-error", new Blob([JSON.stringify(payload)], { type: "application/json" }));
+      } catch (e) {
+        fetch("/api/report-error", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+          keepalive: true,
+        }).catch(function () {});
+      }
+    }
+    window.addEventListener("error", function (e) {
+      report({ message: e.message, stack: e.error && e.error.stack, url: location.href });
+    });
+    window.addEventListener("unhandledrejection", function (e) {
+      var reason = e.reason || {};
+      report({ message: "UnhandledRejection: " + (reason.message || reason), stack: reason.stack, url: location.href });
+    });
+  })();
+</script>
 </head>
 <body>
 

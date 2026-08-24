@@ -1,6 +1,7 @@
 import os
+import threading
 import time
-from flask import Flask, render_template, request
+from flask import Flask, jsonify, render_template, request
 from flask_socketio import SocketIO, join_room, leave_room, emit
 
 app = Flask(__name__)
@@ -8,9 +9,16 @@ app.config['SECRET_KEY'] = 'dev-secret-change-me'
 socketio = SocketIO(app, cors_allowed_origins="*", async_mode="threading")
 
 ROOM_PASSWORD = os.environ.get("ROOM_PASSWORD", "123456789")
+START_TIME = time.time()
 
 # room_id -> { sid: {"name": str, "muted": bool, "camera_off": bool} }
 rooms = {}
+
+# Erros de JS reportados pelos clientes, pra dar visibilidade de problemas em
+# produção sem depender de alguém descrever o bug manualmente.
+error_log = []
+error_log_lock = threading.Lock()
+MAX_ERRORS = 200
 
 
 def room_user_list(room_id):
@@ -23,6 +31,39 @@ def room_user_list(room_id):
 @app.route("/")
 def index():
     return render_template("index.html")
+
+
+@app.route("/api/health")
+def health():
+    with error_log_lock:
+        recent_errors = list(error_log[-30:])
+        error_count = len(error_log)
+    return jsonify(
+        {
+            "status": "ok",
+            "uptime_seconds": round(time.time() - START_TIME),
+            "rooms": {rid: len(members) for rid, members in rooms.items()},
+            "error_count": error_count,
+            "recent_errors": recent_errors,
+        }
+    )
+
+
+@app.route("/api/report-error", methods=["POST"])
+def report_error():
+    data = request.get_json(silent=True) or {}
+    entry = {
+        "message": str(data.get("message", ""))[:500],
+        "stack": str(data.get("stack", ""))[:2000],
+        "url": str(data.get("url", ""))[:300],
+        "user_agent": request.headers.get("User-Agent", "")[:300],
+        "ts": time.time(),
+    }
+    with error_log_lock:
+        error_log.append(entry)
+        if len(error_log) > MAX_ERRORS:
+            del error_log[: len(error_log) - MAX_ERRORS]
+    return jsonify({"ok": True})
 
 
 @socketio.on("connect")
