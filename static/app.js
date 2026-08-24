@@ -28,8 +28,6 @@
   const volumePanel = document.getElementById("volume-panel");
   const callVolumeSlider = document.getElementById("call-volume-slider");
   const callVolumeValue = document.getElementById("call-volume-value");
-  const soundsVolumeSlider = document.getElementById("sounds-volume-slider");
-  const soundsVolumeValue = document.getElementById("sounds-volume-value");
   const leaveBtn = document.getElementById("leave-btn");
 
   const SERVERS = [
@@ -54,7 +52,6 @@
   let camOn = false;
   let sharingScreen = false;
   let callVolume = Number(localStorage.getItem("voxchat-call-volume") ?? 1);
-  let soundsVolume = Number(localStorage.getItem("voxchat-sounds-volume") ?? 1);
 
   const peers = {}; // sid -> RTCPeerConnection
   const remoteNames = {}; // sid -> name
@@ -88,14 +85,8 @@
   // sincronizados entre a sala via um evento simples pelo socket.
 
   let audioCtx = null;
-  let soundsMasterGain = null;
   function getAudioCtx() {
-    if (!audioCtx) {
-      audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-      soundsMasterGain = audioCtx.createGain();
-      soundsMasterGain.gain.value = soundsVolume;
-      soundsMasterGain.connect(audioCtx.destination);
-    }
+    if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
     if (audioCtx.state === "suspended") audioCtx.resume();
     return audioCtx;
   }
@@ -111,7 +102,7 @@
     }
     g.gain.setValueAtTime(gain, start);
     g.gain.exponentialRampToValueAtTime(0.001, start + dur);
-    osc.connect(g).connect(soundsMasterGain);
+    osc.connect(g).connect(ctx.destination);
     osc.start(start);
     osc.stop(start + dur + 0.02);
   }
@@ -131,15 +122,13 @@
     g.gain.setValueAtTime(gain, start);
     g.gain.exponentialRampToValueAtTime(0.001, start + dur);
 
-    src.connect(filter).connect(g).connect(soundsMasterGain);
+    src.connect(filter).connect(g).connect(ctx.destination);
     src.start(start);
     src.stop(start + dur + 0.02);
   }
 
   function playFileSound(src) {
-    const audio = new Audio(src);
-    audio.volume = soundsVolume;
-    audio.play().catch((e) => console.warn("Não deu pra tocar o áudio", e));
+    new Audio(src).play().catch((e) => console.warn("Não deu pra tocar o áudio", e));
   }
 
   const SOUNDS = {
@@ -292,8 +281,6 @@
 
   callVolumeSlider.value = Math.round(callVolume * 100);
   callVolumeValue.textContent = callVolumeSlider.value + "%";
-  soundsVolumeSlider.value = Math.round(soundsVolume * 100);
-  soundsVolumeValue.textContent = soundsVolumeSlider.value + "%";
 
   volumeBtn.addEventListener("click", () => {
     volumePanel.classList.toggle("hidden");
@@ -305,13 +292,6 @@
     callVolumeValue.textContent = callVolumeSlider.value + "%";
     localStorage.setItem("voxchat-call-volume", callVolume);
     applyCallVolume();
-  });
-
-  soundsVolumeSlider.addEventListener("input", () => {
-    soundsVolume = Number(soundsVolumeSlider.value) / 100;
-    soundsVolumeValue.textContent = soundsVolumeSlider.value + "%";
-    localStorage.setItem("voxchat-sounds-volume", soundsVolume);
-    if (soundsMasterGain) soundsMasterGain.gain.value = soundsVolume;
   });
 
   function buildServerPicker() {
